@@ -65,7 +65,7 @@ final class StyleSerializer implements JsonDeserializer<Style>, JsonSerializer<S
   static {
     // Ensure coverage of decorations
     final Set<TextDecoration> knownDecorations = EnumSet.allOf(TextDecoration.class);
-    for (final TextDecoration decoration : DECORATIONS) {
+    for (final TextDecoration decoration : DECORATIONS) {g
       knownDecorations.remove(decoration);
     }
     if (!knownDecorations.isEmpty()) {
@@ -190,8 +190,7 @@ final class StyleSerializer implements JsonDeserializer<Style>, JsonSerializer<S
         throw new JsonParseException(ex);
       }
     }
-    // if we can't handle
-    throw new UnsupportedOperationException();
+    return null;
   }
 
   private Codec.Decoder<Component, String, JsonParseException> decoder(final JsonDeserializationContext ctx) {
