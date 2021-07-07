@@ -190,8 +190,7 @@ final class StyleSerializer implements JsonDeserializer<Style>, JsonSerializer<S
         throw new JsonParseException(ex);
       }
     }
-    // if we can't handle
-    throw new UnsupportedOperationException();
+    return  null;
   }
 
   private Codec.Decoder<Component, String, JsonParseException> decoder(final JsonDeserializationContext ctx) {
