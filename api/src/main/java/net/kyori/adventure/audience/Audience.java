@@ -25,6 +25,8 @@ package net.kyori.adventure.audience;
 
 import java.util.Arrays;
 import java.util.Objects;
+import java.util.function.Consumer;
+import java.util.function.Predicate;
 import java.util.stream.Collector;
 import net.kyori.adventure.bossbar.BossBar;
 import net.kyori.adventure.identity.Identified;
@@ -36,6 +38,7 @@ import net.kyori.adventure.sound.SoundStop;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.ComponentLike;
 import net.kyori.adventure.title.Title;
+import net.kyori.adventure.title.TitlePart;
 import org.jetbrains.annotations.NotNull;
 
 /**
@@ -133,6 +136,41 @@ public interface Audience extends Pointered {
    */
   static @NotNull Collector<? super Audience, ?, ForwardingAudience> toAudience() {
     return Audiences.COLLECTOR;
+  }
+
+  /**
+   * Filters this audience.
+   *
+   * <p>The returned {@code Audience} may be the same, or a completely different one.</p>
+   *
+   * <p>Container audiences such as {@link ForwardingAudience} may or may not have their own identity.
+   * If they do, they <em>may</em> test themselves against the provided {@code filter} first, and if the test fails return an empty audience skipping any contained children.
+   * If they do not, they <em>must not</em> test themselves against the filter, only testing their children.</p>
+   *
+   * @param filter the filter
+   * @since 4.9.0
+   */
+  default @NotNull Audience filterAudience(final @NotNull Predicate<? super Audience> filter) {
+    return filter.test(this)
+      ? this
+      : empty();
+  }
+
+  /**
+   * Executes an action against all audiences.
+   *
+   * <p>If you implement {@code Audience} and not {@link ForwardingAudience} in your own code, and your audience forwards to
+   * other audiences, then you <b>must</b> override this method and provide each audience to {@code action}.</p>
+   *
+   * <p>If an implementation of {@code Audience} has its own identity distinct from its contained children, it <em>may</em> test
+   * itself against the provided {@code filter} first, and  if the test fails return an empty audience skipping any contained children.
+   * If it does not, it <em>must not</em> test itself against the filter, only testing its children.</p>
+   *
+   * @param action the action
+   * @since 4.9.0
+   */
+  default void forEachAudience(final @NotNull Consumer<? super Audience> action) {
+    action.accept(this);
   }
 
   /**
@@ -403,7 +441,25 @@ public interface Audience extends Pointered {
    * @see Title
    * @since 4.0.0
    */
+  @ForwardingAudienceOverrideNotRequired
   default void showTitle(final @NotNull Title title) {
+    final Title.Times times = title.times();
+    if (times != null) this.sendTitlePart(TitlePart.TIMES, times);
+    
+    this.sendTitlePart(TitlePart.SUBTITLE, title.subtitle());
+    this.sendTitlePart(TitlePart.TITLE, title.title());
+  }
+
+  /**
+   * Shows a part of a title.
+   *
+   * @param part the part
+   * @param value the value
+   * @param <T> the type of the value of the part
+   * @throws IllegalArgumentException if a title part that is not in {@link TitlePart} is used
+   * @since 4.9.0
+   */
+  default <T> void sendTitlePart(final @NotNull TitlePart<T> part, final @NotNull T value) {
   }
 
   /**

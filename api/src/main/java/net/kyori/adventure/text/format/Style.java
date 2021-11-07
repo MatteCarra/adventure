@@ -40,6 +40,7 @@ import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.jetbrains.annotations.UnknownNullability;
 import org.jetbrains.annotations.Unmodifiable;
 
 /**
@@ -163,11 +164,15 @@ public interface Style extends Buildable<Style, Style.Builder>, Examinable {
    * @return a style
    * @since 4.0.0
    */
-  static @NotNull Style style(final StyleBuilderApplicable@NotNull... applicables) {
-    if (applicables.length == 0) return empty();
+  static @NotNull Style style(final @UnknownNullability StyleBuilderApplicable@NotNull... applicables) {
+    final int length = applicables.length;
+    if (length == 0) return empty();
     final Builder builder = style();
-    for (int i = 0, length = applicables.length; i < length; i++) {
-      applicables[i].styleApply(builder);
+    for (int i = 0; i < length; i++) {
+      final StyleBuilderApplicable applicable = applicables[i];
+      if (applicable != null) {
+        applicable.styleApply(builder);
+      }
     }
     return builder.build();
   }
@@ -687,6 +692,23 @@ public interface Style extends Buildable<Style, Style.Builder>, Examinable {
     @Contract("_, _ -> this")
     default @NotNull Builder decoration(final @NotNull TextDecoration decoration, final boolean flag) {
       return this.decoration(decoration, TextDecoration.State.byBoolean(flag));
+    }
+
+    /**
+     * Sets decorations for this style using the specified {@code decorations} map.
+     *
+     * <p>If a given decoration does not have a value explicitly set, the value of that particular decoration is not changed.</p>
+     *
+     * @param decorations a map containing text decorations and their respective state.
+     * @return this builder.
+     * @since 4.10.0
+     */
+    @Contract("_ -> this")
+    default @NotNull Builder decorations(final @NotNull Map<TextDecoration, TextDecoration.State> decorations) {
+      for (final Map.Entry<TextDecoration, TextDecoration.State> entry : decorations.entrySet()) {
+        this.decoration(entry.getKey(), entry.getValue());
+      }
+      return this;
     }
 
     /**

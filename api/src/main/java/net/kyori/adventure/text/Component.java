@@ -30,6 +30,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.Spliterator;
+import java.util.Spliterators;
 import java.util.function.BiPredicate;
 import java.util.function.Consumer;
 import java.util.function.Function;
@@ -46,13 +48,17 @@ import net.kyori.adventure.text.format.TextDecoration;
 import net.kyori.adventure.text.serializer.ComponentSerializer;
 import net.kyori.adventure.translation.Translatable;
 import net.kyori.adventure.util.Buildable;
+import net.kyori.adventure.util.ForwardingIterator;
 import net.kyori.adventure.util.IntFunction2;
+import net.kyori.adventure.util.MonkeyBars;
 import net.kyori.examination.Examinable;
 import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.jetbrains.annotations.Unmodifiable;
+
+import static java.util.Objects.requireNonNull;
 
 /**
  * A Component is an immutable object that represents how text
@@ -146,7 +152,10 @@ public interface Component extends ComponentBuilderApplicable, ComponentLike, Ex
    * @param components the components
    * @return a text component
    * @since 4.0.0
+   * @deprecated for removal since 4.9.0, use {@link #join(JoinConfiguration, ComponentLike...)} with {@link JoinConfiguration#separator(ComponentLike)} instead.
    */
+  @ApiStatus.ScheduledForRemoval(inVersion = "5.0.0")
+  @Deprecated
   @Contract(value = "_, _ -> new", pure = true)
   static @NotNull TextComponent join(final @NotNull ComponentLike separator, final @NotNull ComponentLike@NotNull... components) {
     return join(separator, Arrays.asList(components));
@@ -159,21 +168,48 @@ public interface Component extends ComponentBuilderApplicable, ComponentLike, Ex
    * @param components the components
    * @return a text component
    * @since 4.0.0
+   * @deprecated for removal since 4.9.0, use {@link #join(JoinConfiguration, Iterable)} with {@link JoinConfiguration#separator(ComponentLike)} instead.
    */
+  @ApiStatus.ScheduledForRemoval(inVersion = "5.0.0")
+  @Deprecated
   @Contract(value = "_, _ -> new", pure = true)
   static @NotNull TextComponent join(final @NotNull ComponentLike separator, final Iterable<? extends ComponentLike> components) {
-    final Iterator<? extends ComponentLike> it = components.iterator();
-    if (!it.hasNext()) {
-      return Component.empty();
-    }
-    final TextComponent.Builder builder = text();
-    while (it.hasNext()) {
-      builder.append(it.next());
-      if (it.hasNext()) {
-        builder.append(separator);
-      }
-    }
-    return builder.build();
+    final Component component = join(JoinConfiguration.separator(separator), components);
+
+    if (component instanceof TextComponent) return (TextComponent) component;
+    return Component.text().append(component).build();
+  }
+
+  /**
+   * Joins {@code components} using the configuration in {@code config}.
+   *
+   * @param config the join configuration
+   * @param components the components
+   * @return the resulting component
+   * @see JoinConfiguration#noSeparators()
+   * @see JoinConfiguration#separator(ComponentLike)
+   * @see JoinConfiguration#separators(ComponentLike, ComponentLike)
+   * @since 4.9.0
+   */
+  @Contract(pure = true)
+  static @NotNull Component join(final @NotNull JoinConfiguration config, final @NotNull ComponentLike@NotNull... components) {
+    return join(config, Arrays.asList(components));
+  }
+
+  /**
+   * Joins {@code components} using the configuration in {@code config}.
+   *
+   * @param config the join configuration
+   * @param components the components
+   * @return the resulting component
+   * @see JoinConfiguration#noSeparators()
+   * @see JoinConfiguration#separator(ComponentLike)
+   * @see JoinConfiguration#separators(ComponentLike, ComponentLike)
+   * @since 4.9.0
+   */
+  @Contract(pure = true)
+  static @NotNull Component join(final @NotNull JoinConfiguration config, final @NotNull Iterable<? extends ComponentLike> components) {
+    return JoinConfigurationImpl.join(config, components);
   }
 
   /**
@@ -369,6 +405,18 @@ public interface Component extends ComponentBuilderApplicable, ComponentLike, Ex
   }
 
   /**
+   * Creates a keybind component with a keybind.
+   *
+   * @param keybind the keybind
+   * @return the keybind component
+   * @since 4.9.0
+   */
+  @Contract(value = "_ -> new", pure = true)
+  static @NotNull KeybindComponent keybind(final KeybindComponent.@NotNull KeybindLike keybind) {
+    return keybind(requireNonNull(keybind, "keybind").asKeybind(), Style.empty());
+  }
+
+  /**
    * Creates a keybind component with a keybind and styling.
    *
    * @param keybind the keybind
@@ -382,6 +430,19 @@ public interface Component extends ComponentBuilderApplicable, ComponentLike, Ex
   }
 
   /**
+   * Creates a keybind component with a keybind and styling.
+   *
+   * @param keybind the keybind
+   * @param style the style
+   * @return the keybind component
+   * @since 4.9.0
+   */
+  @Contract(value = "_, _ -> new", pure = true)
+  static @NotNull KeybindComponent keybind(final KeybindComponent.@NotNull KeybindLike keybind, final @NotNull Style style) {
+    return new KeybindComponentImpl(Collections.emptyList(), style, requireNonNull(keybind, "keybind").asKeybind());
+  }
+
+  /**
    * Creates a keybind component with a keybind, and optional color.
    *
    * @param keybind the keybind
@@ -392,6 +453,19 @@ public interface Component extends ComponentBuilderApplicable, ComponentLike, Ex
   @Contract(value = "_, _ -> new", pure = true)
   static @NotNull KeybindComponent keybind(final @NotNull String keybind, final @Nullable TextColor color) {
     return keybind(keybind, Style.style(color));
+  }
+
+  /**
+   * Creates a keybind component with a keybind, and optional color.
+   *
+   * @param keybind the keybind
+   * @param color the color
+   * @return the keybind component
+   * @since 4.9.0
+   */
+  @Contract(value = "_, _ -> new", pure = true)
+  static @NotNull KeybindComponent keybind(final KeybindComponent.@NotNull KeybindLike keybind, final @Nullable TextColor color) {
+    return keybind(requireNonNull(keybind, "keybind").asKeybind(), Style.style(color));
   }
 
   /**
@@ -415,11 +489,39 @@ public interface Component extends ComponentBuilderApplicable, ComponentLike, Ex
    * @param color the color
    * @param decorations the decorations
    * @return the keybind component
+   * @since 4.9.0
+   */
+  @Contract(value = "_, _, _ -> new", pure = true)
+  static @NotNull KeybindComponent keybind(final KeybindComponent.@NotNull KeybindLike keybind, final @Nullable TextColor color, final TextDecoration@NotNull... decorations) {
+    return keybind(requireNonNull(keybind, "keybind").asKeybind(), Style.style(color, decorations));
+  }
+
+  /**
+   * Creates a keybind component with a keybind, and optional color and decorations.
+   *
+   * @param keybind the keybind
+   * @param color the color
+   * @param decorations the decorations
+   * @return the keybind component
    * @since 4.0.0
    */
   @Contract(value = "_, _, _ -> new", pure = true)
   static @NotNull KeybindComponent keybind(final @NotNull String keybind, final @Nullable TextColor color, final @NotNull Set<TextDecoration> decorations) {
     return keybind(keybind, Style.style(color, decorations));
+  }
+
+  /**
+   * Creates a keybind component with a keybind, and optional color and decorations.
+   *
+   * @param keybind the keybind
+   * @param color the color
+   * @param decorations the decorations
+   * @return the keybind component
+   * @since 4.9.0
+   */
+  @Contract(value = "_, _, _ -> new", pure = true)
+  static @NotNull KeybindComponent keybind(final KeybindComponent.@NotNull KeybindLike keybind, final @Nullable TextColor color, final @NotNull Set<TextDecoration> decorations) {
+    return keybind(requireNonNull(keybind, "keybind").asKeybind(), Style.style(color, decorations));
   }
 
   /*
@@ -644,7 +746,7 @@ public interface Component extends ComponentBuilderApplicable, ComponentLike, Ex
   @Contract(value = "_ -> new", pure = true)
   static @NotNull TextComponent text(final @NotNull String content) {
     if (content.isEmpty()) return empty();
-    return new TextComponentImpl(Collections.emptyList(), Style.empty(), content);
+    return text(content, Style.empty());
   }
 
   /**
@@ -670,7 +772,7 @@ public interface Component extends ComponentBuilderApplicable, ComponentLike, Ex
    */
   @Contract(value = "_, _ -> new", pure = true)
   static @NotNull TextComponent text(final @NotNull String content, final @Nullable TextColor color) {
-    return new TextComponentImpl(Collections.emptyList(), Style.style(color), content);
+    return text(content, Style.style(color));
   }
 
   /**
@@ -684,7 +786,7 @@ public interface Component extends ComponentBuilderApplicable, ComponentLike, Ex
    */
   @Contract(value = "_, _, _ -> new", pure = true)
   static @NotNull TextComponent text(final @NotNull String content, final @Nullable TextColor color, final TextDecoration@NotNull... decorations) {
-    return new TextComponentImpl(Collections.emptyList(), Style.style(color, decorations), content);
+    return text(content, Style.style(color, decorations));
   }
 
   /**
@@ -698,7 +800,7 @@ public interface Component extends ComponentBuilderApplicable, ComponentLike, Ex
    */
   @Contract(value = "_, _, _ -> new", pure = true)
   static @NotNull TextComponent text(final @NotNull String content, final @Nullable TextColor color, final @NotNull Set<TextDecoration> decorations) {
-    return new TextComponentImpl(Collections.emptyList(), Style.style(color, decorations), content);
+    return text(content, Style.style(color, decorations));
   }
 
   /**
@@ -1149,7 +1251,7 @@ public interface Component extends ComponentBuilderApplicable, ComponentLike, Ex
    */
   @Contract(value = "_ -> new", pure = true)
   static @NotNull TranslatableComponent translatable(final @NotNull Translatable translatable) {
-    return translatable(Objects.requireNonNull(translatable, "translatable").translationKey(), Style.empty());
+    return translatable(requireNonNull(translatable, "translatable").translationKey(), Style.empty());
   }
 
   /**
@@ -1175,7 +1277,7 @@ public interface Component extends ComponentBuilderApplicable, ComponentLike, Ex
    */
   @Contract(value = "_, _ -> new", pure = true)
   static @NotNull TranslatableComponent translatable(final @NotNull Translatable translatable, final @NotNull Style style) {
-    return translatable(Objects.requireNonNull(translatable, "translatable").translationKey(), style);
+    return translatable(requireNonNull(translatable, "translatable").translationKey(), style);
   }
 
   /**
@@ -1201,7 +1303,7 @@ public interface Component extends ComponentBuilderApplicable, ComponentLike, Ex
    */
   @Contract(value = "_, _ -> new", pure = true)
   static @NotNull TranslatableComponent translatable(final @NotNull Translatable translatable, final @Nullable TextColor color) {
-    return translatable(Objects.requireNonNull(translatable, "translatable").translationKey(), color);
+    return translatable(requireNonNull(translatable, "translatable").translationKey(), color);
   }
 
   /**
@@ -1229,7 +1331,7 @@ public interface Component extends ComponentBuilderApplicable, ComponentLike, Ex
    */
   @Contract(value = "_, _, _ -> new", pure = true)
   static @NotNull TranslatableComponent translatable(final @NotNull Translatable translatable, final @Nullable TextColor color, final TextDecoration@NotNull... decorations) {
-    return translatable(Objects.requireNonNull(translatable, "translatable").translationKey(), color, decorations);
+    return translatable(requireNonNull(translatable, "translatable").translationKey(), color, decorations);
   }
 
   /**
@@ -1257,7 +1359,7 @@ public interface Component extends ComponentBuilderApplicable, ComponentLike, Ex
    */
   @Contract(value = "_, _, _ -> new", pure = true)
   static @NotNull TranslatableComponent translatable(final @NotNull Translatable translatable, final @Nullable TextColor color, final @NotNull Set<TextDecoration> decorations) {
-    return translatable(Objects.requireNonNull(translatable, "translatable").translationKey(), color, decorations);
+    return translatable(requireNonNull(translatable, "translatable").translationKey(), color, decorations);
   }
 
   /**
@@ -1283,7 +1385,7 @@ public interface Component extends ComponentBuilderApplicable, ComponentLike, Ex
    */
   @Contract(value = "_, _ -> new", pure = true)
   static @NotNull TranslatableComponent translatable(final @NotNull Translatable translatable, final @NotNull ComponentLike@NotNull... args) {
-    return translatable(Objects.requireNonNull(translatable, "translatable").translationKey(), args);
+    return translatable(requireNonNull(translatable, "translatable").translationKey(), args);
   }
 
   /**
@@ -1311,7 +1413,7 @@ public interface Component extends ComponentBuilderApplicable, ComponentLike, Ex
    */
   @Contract(value = "_, _, _ -> new", pure = true)
   static @NotNull TranslatableComponent translatable(final @NotNull Translatable translatable, final @NotNull Style style, final @NotNull ComponentLike@NotNull... args) {
-    return translatable(Objects.requireNonNull(translatable, "translatable").translationKey(), style, args);
+    return translatable(requireNonNull(translatable, "translatable").translationKey(), style, args);
   }
 
   /**
@@ -1339,7 +1441,7 @@ public interface Component extends ComponentBuilderApplicable, ComponentLike, Ex
    */
   @Contract(value = "_, _, _ -> new", pure = true)
   static @NotNull TranslatableComponent translatable(final @NotNull Translatable translatable, final @Nullable TextColor color, final @NotNull ComponentLike@NotNull... args) {
-    return translatable(Objects.requireNonNull(translatable, "translatable").translationKey(), color, args);
+    return translatable(requireNonNull(translatable, "translatable").translationKey(), color, args);
   }
 
   /**
@@ -1369,7 +1471,7 @@ public interface Component extends ComponentBuilderApplicable, ComponentLike, Ex
    */
   @Contract(value = "_, _, _, _ -> new", pure = true)
   static @NotNull TranslatableComponent translatable(final @NotNull Translatable translatable, final @Nullable TextColor color, final @NotNull Set<TextDecoration> decorations, final @NotNull ComponentLike@NotNull... args) {
-    return translatable(Objects.requireNonNull(translatable, "translatable").translationKey(), color, decorations, args);
+    return translatable(requireNonNull(translatable, "translatable").translationKey(), color, decorations, args);
   }
 
   /**
@@ -1395,7 +1497,7 @@ public interface Component extends ComponentBuilderApplicable, ComponentLike, Ex
    */
   @Contract(value = "_, _ -> new", pure = true)
   static @NotNull TranslatableComponent translatable(final @NotNull Translatable translatable, final @NotNull List<? extends ComponentLike> args) {
-    return translatable(Objects.requireNonNull(translatable, "translatable").translationKey(), args);
+    return translatable(requireNonNull(translatable, "translatable").translationKey(), args);
   }
 
   /**
@@ -1423,7 +1525,7 @@ public interface Component extends ComponentBuilderApplicable, ComponentLike, Ex
    */
   @Contract(value = "_, _, _ -> new", pure = true)
   static @NotNull TranslatableComponent translatable(final @NotNull Translatable translatable, final @NotNull Style style, final @NotNull List<? extends ComponentLike> args) {
-    return translatable(Objects.requireNonNull(translatable, "translatable").translationKey(), style, args);
+    return translatable(requireNonNull(translatable, "translatable").translationKey(), style, args);
   }
 
   /**
@@ -1451,7 +1553,7 @@ public interface Component extends ComponentBuilderApplicable, ComponentLike, Ex
    */
   @Contract(value = "_, _, _ -> new", pure = true)
   static TranslatableComponent translatable(final @NotNull Translatable translatable, final @Nullable TextColor color, final @NotNull List<? extends ComponentLike> args) {
-    return translatable(Objects.requireNonNull(translatable, "translatable").translationKey(), color, args);
+    return translatable(requireNonNull(translatable, "translatable").translationKey(), color, args);
   }
 
   /**
@@ -1481,7 +1583,7 @@ public interface Component extends ComponentBuilderApplicable, ComponentLike, Ex
    */
   @Contract(value = "_, _, _, _ -> new", pure = true)
   static @NotNull TranslatableComponent translatable(final @NotNull Translatable translatable, final @Nullable TextColor color, final @NotNull Set<TextDecoration> decorations, final @NotNull List<? extends ComponentLike> args) {
-    return translatable(Objects.requireNonNull(translatable, "translatable").translationKey(), color, decorations, args);
+    return translatable(requireNonNull(translatable, "translatable").translationKey(), color, decorations, args);
   }
 
   /**
@@ -1559,6 +1661,7 @@ public interface Component extends ComponentBuilderApplicable, ComponentLike, Ex
    * @deprecated for removal since 4.7.0, with no replacement - this method is not necessary due to the fact {@code Component}s are immutable
    * @since 4.0.0
    */
+  @ApiStatus.ScheduledForRemoval(inVersion = "5.0.0")
   @Deprecated
   default void detectCycle(final @NotNull Component that) {
     if (that.contains(this)) {
@@ -1574,17 +1677,24 @@ public interface Component extends ComponentBuilderApplicable, ComponentLike, Ex
    * @since 4.0.0
    */
   @Contract(pure = true)
-  @NotNull Component append(final @NotNull Component component);
+  default @NotNull Component append(final @NotNull Component component) {
+    return this.append((ComponentLike) component);
+  }
 
   /**
    * Appends a component to this component.
    *
-   * @param component the component to append
+   * @param like the component to append
    * @return a component with the component added
    * @since 4.0.0
    */
-  default @NotNull Component append(final @NotNull ComponentLike component) {
-    return this.append(component.asComponent());
+  default @NotNull Component append(final @NotNull ComponentLike like) {
+    requireNonNull(like, "like");
+    final Component component = like.asComponent();
+    requireNonNull(component, "component");
+    if (component == Component.empty()) return this;
+    final List<Component> oldChildren = this.children();
+    return this.children(MonkeyBars.addOne(oldChildren, component));
   }
 
   /**
@@ -1903,7 +2013,10 @@ public interface Component extends ComponentBuilderApplicable, ComponentLike, Ex
    * @since 4.2.0
    */
   @Contract(pure = true)
-  @NotNull Component replaceText(final @NotNull Consumer<TextReplacementConfig.Builder> configurer);
+  default @NotNull Component replaceText(final @NotNull Consumer<TextReplacementConfig.Builder> configurer) {
+    requireNonNull(configurer, "configurer");
+    return this.replaceText(Buildable.configureAndBuild(TextReplacementConfig.builder(), configurer));
+  }
 
   /**
    * Finds and replaces any text with this or child {@link Component}s using the provided options.
@@ -1913,7 +2026,105 @@ public interface Component extends ComponentBuilderApplicable, ComponentLike, Ex
    * @since 4.2.0
    */
   @Contract(pure = true)
-  @NotNull Component replaceText(final @NotNull TextReplacementConfig config);
+  default @NotNull Component replaceText(final @NotNull TextReplacementConfig config) {
+    requireNonNull(config, "replacement");
+    if (!(config instanceof TextReplacementConfigImpl)) {
+      throw new IllegalArgumentException("Provided replacement was a custom TextReplacementConfig implementation, which is not supported.");
+    }
+    return TextReplacementRenderer.INSTANCE.render(this, ((TextReplacementConfigImpl) config).createState());
+  }
+
+  /**
+   * Create a new component with any redundant style elements or children removed.
+   *
+   * @return the optimized component
+   * @since 4.9.0
+   */
+  default @NotNull Component compact() {
+    return ComponentCompaction.compact(this, null);
+  }
+
+  /**
+   * Returns an iterable view of this component.
+   *
+   * @param type the type
+   * @param flags the flags
+   * @return the iterable
+   * @since 4.9.0
+   */
+  default @NotNull Iterable<Component> iterable(final @NotNull ComponentIteratorType type, final @NotNull ComponentIteratorFlag@Nullable... flags) {
+    return this.iterable(type, flags == null ? Collections.emptySet() : MonkeyBars.enumSet(ComponentIteratorFlag.class, flags));
+  }
+
+  /**
+   * Returns an iterable view of this component.
+   *
+   * @param type the type
+   * @param flags the flags
+   * @return the iterable
+   * @since 4.9.0
+   */
+  default @NotNull Iterable<Component> iterable(final @NotNull ComponentIteratorType type, final @NotNull Set<ComponentIteratorFlag> flags) {
+    requireNonNull(type, "type");
+    requireNonNull(flags, "flags");
+    return new ForwardingIterator<>(() -> this.iterator(type, flags), () -> this.spliterator(type, flags));
+  }
+
+  /**
+   * Returns an iterator for this component.
+   *
+   * <p>As components are immutable, this iterator does not support removal.</p>
+   *
+   * @param type the type
+   * @param flags the flags
+   * @return the iterator
+   * @since 4.9.0
+   */
+  default @NotNull Iterator<Component> iterator(final @NotNull ComponentIteratorType type, final @NotNull ComponentIteratorFlag@Nullable... flags) {
+    return this.iterator(type, flags == null ? Collections.emptySet() : MonkeyBars.enumSet(ComponentIteratorFlag.class, flags));
+  }
+
+  /**
+   * Returns an iterator for this component.
+   *
+   * <p>As components are immutable, this iterator does not support removal.</p>
+   *
+   * @param type the type
+   * @param flags the flags
+   * @return the iterator
+   * @since 4.9.0
+   */
+  default @NotNull Iterator<Component> iterator(final @NotNull ComponentIteratorType type, final @NotNull Set<ComponentIteratorFlag> flags) {
+    return new ComponentIterator(this, requireNonNull(type, "type"), requireNonNull(flags, "flags"));
+  }
+
+  /**
+   * Returns a spliterator for this component.
+   *
+   * <p>The resulting spliterator has the {@link Spliterator#IMMUTABLE}, {@link Spliterator#NONNULL} and {@link Spliterator#ORDERED} characteristics.</p>
+   *
+   * @param type the type
+   * @param flags the flags
+   * @return the spliterator
+   * @since 4.9.0
+   */
+  default @NotNull Spliterator<Component> spliterator(final @NotNull ComponentIteratorType type, final @NotNull ComponentIteratorFlag@Nullable... flags) {
+    return this.spliterator(type, flags == null ? Collections.emptySet() : MonkeyBars.enumSet(ComponentIteratorFlag.class, flags));
+  }
+
+  /**
+   * Returns a spliterator for this component.
+   *
+   * <p>The resulting spliterator has the {@link Spliterator#IMMUTABLE}, {@link Spliterator#NONNULL} and {@link Spliterator#ORDERED} characteristics.</p>
+   *
+   * @param type the type
+   * @param flags the flags
+   * @return the spliterator
+   * @since 4.9.0
+   */
+  default @NotNull Spliterator<Component> spliterator(final @NotNull ComponentIteratorType type, final @NotNull Set<ComponentIteratorFlag> flags) {
+    return Spliterators.spliteratorUnknownSize(this.iterator(type, flags), Spliterator.IMMUTABLE & Spliterator.NONNULL & Spliterator.ORDERED);
+  }
 
   /**
    * Finds and replaces text within any {@link Component}s using a string literal.
@@ -1924,7 +2135,7 @@ public interface Component extends ComponentBuilderApplicable, ComponentLike, Ex
    * @since 4.0.0
    * @deprecated for removal since 4.2.0, use {@link #replaceText(Consumer)} or {@link #replaceText(TextReplacementConfig)} instead.
    */
-  @ApiStatus.ScheduledForRemoval
+  @ApiStatus.ScheduledForRemoval(inVersion = "5.0.0")
   @Contract(pure = true)
   @Deprecated
   default @NotNull Component replaceText(final @NotNull String search, final @Nullable ComponentLike replacement) {
@@ -1940,7 +2151,7 @@ public interface Component extends ComponentBuilderApplicable, ComponentLike, Ex
    * @since 4.0.0
    * @deprecated for removal since 4.2.0, use {@link #replaceText(Consumer)} or {@link #replaceText(TextReplacementConfig)} instead.
    */
-  @ApiStatus.ScheduledForRemoval
+  @ApiStatus.ScheduledForRemoval(inVersion = "5.0.0")
   @Contract(pure = true)
   @Deprecated
   default @NotNull Component replaceText(final @NotNull Pattern pattern, final @NotNull Function<TextComponent.Builder, @Nullable ComponentLike> replacement) {
@@ -1956,7 +2167,7 @@ public interface Component extends ComponentBuilderApplicable, ComponentLike, Ex
    * @since 4.0.0
    * @deprecated for removal since 4.2.0, use {@link #replaceText(Consumer)} or {@link #replaceText(TextReplacementConfig)} instead.
    */
-  @ApiStatus.ScheduledForRemoval
+  @ApiStatus.ScheduledForRemoval(inVersion = "5.0.0")
   @Contract(pure = true)
   @Deprecated
   default @NotNull Component replaceFirstText(final @NotNull String search, final @Nullable ComponentLike replacement) {
@@ -1972,7 +2183,7 @@ public interface Component extends ComponentBuilderApplicable, ComponentLike, Ex
    * @since 4.0.0
    * @deprecated for removal since 4.2.0, use {@link #replaceText(Consumer)} or {@link #replaceText(TextReplacementConfig)} instead.
    */
-  @ApiStatus.ScheduledForRemoval
+  @ApiStatus.ScheduledForRemoval(inVersion = "5.0.0")
   @Contract(pure = true)
   @Deprecated
   default @NotNull Component replaceFirstText(final @NotNull Pattern pattern, final @NotNull Function<TextComponent.Builder, @Nullable ComponentLike> replacement) {
@@ -1989,7 +2200,7 @@ public interface Component extends ComponentBuilderApplicable, ComponentLike, Ex
    * @since 4.0.0
    * @deprecated for removal since 4.2.0, use {@link #replaceText(Consumer)} or {@link #replaceText(TextReplacementConfig)} instead.
    */
-  @ApiStatus.ScheduledForRemoval
+  @ApiStatus.ScheduledForRemoval(inVersion = "5.0.0")
   @Contract(pure = true)
   @Deprecated
   default @NotNull Component replaceText(final @NotNull String search, final @Nullable ComponentLike replacement, final int numberOfReplacements) {
@@ -2006,7 +2217,7 @@ public interface Component extends ComponentBuilderApplicable, ComponentLike, Ex
    * @since 4.0.0
    * @deprecated for removal since 4.2.0, use {@link #replaceText(Consumer)} or {@link #replaceText(TextReplacementConfig)} instead.
    */
-  @ApiStatus.ScheduledForRemoval
+  @ApiStatus.ScheduledForRemoval(inVersion = "5.0.0")
   @Contract(pure = true)
   @Deprecated
   default @NotNull Component replaceText(final @NotNull Pattern pattern, final @NotNull Function<TextComponent.Builder, @Nullable ComponentLike> replacement, final int numberOfReplacements) {
@@ -2025,7 +2236,7 @@ public interface Component extends ComponentBuilderApplicable, ComponentLike, Ex
    * @since 4.0.0
    * @deprecated for removal since 4.2.0, use {@link #replaceText(Consumer)} or {@link #replaceText(TextReplacementConfig)} instead.
    */
-  @ApiStatus.ScheduledForRemoval
+  @ApiStatus.ScheduledForRemoval(inVersion = "5.0.0")
   @Contract(pure = true)
   @Deprecated
   default @NotNull Component replaceText(final @NotNull String search, final @Nullable ComponentLike replacement, final @NotNull IntFunction2<PatternReplacementResult> fn) {
@@ -2044,7 +2255,7 @@ public interface Component extends ComponentBuilderApplicable, ComponentLike, Ex
    * @since 4.0.0
    * @deprecated for removal since 4.2.0, use {@link #replaceText(Consumer)} or {@link #replaceText(TextReplacementConfig)} instead.
    */
-  @ApiStatus.ScheduledForRemoval
+  @ApiStatus.ScheduledForRemoval(inVersion = "5.0.0")
   @Contract(pure = true)
   @Deprecated
   default @NotNull Component replaceText(final @NotNull Pattern pattern, final @NotNull Function<TextComponent.Builder, @Nullable ComponentLike> replacement, final @NotNull IntFunction2<PatternReplacementResult> fn) {

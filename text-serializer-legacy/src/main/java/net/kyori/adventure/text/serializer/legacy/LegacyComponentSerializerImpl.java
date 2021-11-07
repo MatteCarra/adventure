@@ -234,7 +234,7 @@ final class LegacyComponentSerializerImpl implements LegacyComponentSerializer {
     if (this.urlReplacementConfig == null) return component;
     final Component newComponent = component.replaceText(this.urlReplacementConfig);
     if (newComponent instanceof TextComponent) return (TextComponent) newComponent;
-    return TextComponent.ofChildren(newComponent);
+    return Component.text().append(newComponent).build();
   }
 
   @Override
@@ -498,6 +498,7 @@ final class LegacyComponentSerializerImpl implements LegacyComponentSerializer {
       this.urlReplacementConfig = serializer.urlReplacementConfig;
       this.hexColours = serializer.hexColours;
       this.useTerriblyStupidHexFormat = serializer.useTerriblyStupidHexFormat;
+      this.flattener = serializer.flattener;
     }
 
     @Override

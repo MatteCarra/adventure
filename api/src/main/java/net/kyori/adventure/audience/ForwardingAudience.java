@@ -23,8 +23,12 @@
  */
 package net.kyori.adventure.audience;
 
+import java.util.ArrayList;
 import java.util.Collections;
+import java.util.List;
 import java.util.Optional;
+import java.util.function.Consumer;
+import java.util.function.Predicate;
 import java.util.function.Supplier;
 import net.kyori.adventure.bossbar.BossBar;
 import net.kyori.adventure.identity.Identified;
@@ -35,7 +39,7 @@ import net.kyori.adventure.pointer.Pointers;
 import net.kyori.adventure.sound.Sound;
 import net.kyori.adventure.sound.SoundStop;
 import net.kyori.adventure.text.Component;
-import net.kyori.adventure.title.Title;
+import net.kyori.adventure.title.TitlePart;
 import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
@@ -63,19 +67,32 @@ public interface ForwardingAudience extends Audience {
   @NotNull Iterable<? extends Audience> audiences();
 
   @Override
-  default <T> @NotNull Optional<T> get(final @NotNull Pointer<T> pointer) {
-    return Optional.empty(); // unsupported
-  }
-
-  @Contract("_, null -> null; _, !null -> !null")
-  @Override
-  default <T> @Nullable T getOrDefault(final @NotNull Pointer<T> pointer, final @Nullable T defaultValue) {
-    return defaultValue; // unsupported
+  default @NotNull Pointers pointers() {
+    return Pointers.empty(); // unsupported
   }
 
   @Override
-  default <T> @UnknownNullability T getOrDefaultFrom(final @NotNull Pointer<T> pointer, final @NotNull Supplier<? extends T> defaultValue) {
-    return defaultValue.get(); // unsupported
+  default @NotNull Audience filterAudience(final @NotNull Predicate<? super Audience> filter) {
+    @Nullable List<Audience> audiences = null;
+    for (final Audience audience : this.audiences()) {
+      if (filter.test(audience)) {
+        final Audience filtered = audience.filterAudience(filter);
+        if (filtered != Audience.empty()) {
+          if (audiences == null) {
+            audiences = new ArrayList<>();
+          }
+          audiences.add(filtered);
+        }
+      }
+    }
+    return audiences != null
+      ? Audience.audience(audiences)
+      : Audience.empty();
+  }
+
+  @Override
+  default void forEachAudience(final @NotNull Consumer<? super Audience> action) {
+    for (final Audience audience : this.audiences()) audience.forEachAudience(action);
   }
 
   @Override
@@ -109,8 +126,8 @@ public interface ForwardingAudience extends Audience {
   }
 
   @Override
-  default void showTitle(final @NotNull Title title) {
-    for (final Audience audience : this.audiences()) audience.showTitle(title);
+  default <T> void sendTitlePart(final @NotNull TitlePart<T> part, final @NotNull T value) {
+    for (final Audience audience : this.audiences()) audience.sendTitlePart(part, value);
   }
 
   @Override
@@ -202,6 +219,19 @@ public interface ForwardingAudience extends Audience {
     }
 
     @Override
+    default @NotNull Audience filterAudience(final @NotNull Predicate<? super Audience> filter) {
+      final Audience audience = this.audience();
+      return filter.test(audience)
+        ? this
+        : Audience.empty();
+    }
+
+    @Override
+    default void forEachAudience(final @NotNull Consumer<? super Audience> action) {
+      this.audience().forEachAudience(action);
+    }
+
+    @Override
     default @NotNull Pointers pointers() {
       return this.audience().pointers();
     }
@@ -237,8 +267,8 @@ public interface ForwardingAudience extends Audience {
     }
 
     @Override
-    default void showTitle(final @NotNull Title title) {
-      this.audience().showTitle(title);
+    default <T> void sendTitlePart(final @NotNull TitlePart<T> part, @NotNull final T value) {
+      this.audience().sendTitlePart(part, value);
     }
 
     @Override
