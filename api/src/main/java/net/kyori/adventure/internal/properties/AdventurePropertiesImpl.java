@@ -25,9 +25,6 @@ package net.kyori.adventure.internal.properties;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.Optional;
 import java.util.Properties;
 import java.util.function.Function;
@@ -39,20 +36,6 @@ final class AdventurePropertiesImpl {
   private static final String FILESYSTEM_DIRECTORY_NAME = "config";
   private static final String FILESYSTEM_FILE_NAME = "adventure.properties";
   private static final Properties PROPERTIES = new Properties();
-
-  static {
-    final Path path = Optional.ofNullable(System.getProperty(systemPropertyName("config")))
-      .map(Paths::get)
-      .orElseGet(() -> Paths.get(FILESYSTEM_DIRECTORY_NAME, FILESYSTEM_FILE_NAME));
-    if (Files.isRegularFile(path)) {
-      try (final InputStream is = Files.newInputStream(path)) {
-        PROPERTIES.load(is);
-      } catch (final IOException e) {
-        // Well, that's awkward.
-        print(e);
-      }
-    }
-  }
 
   @SuppressWarnings("CatchAndPrintStacktrace") // we don't have any better options on Java 8
   private static void print(final Throwable ex) {

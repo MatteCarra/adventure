@@ -234,7 +234,7 @@ final class StyleSerializer extends TypeAdapter<Style> {
       }
     }
     // if we can't handle
-    throw new UnsupportedOperationException();
+    return null;
   }
 
   private Codec.Decoder<Component, String, JsonParseException> decoder() {
